@@ -34,9 +34,26 @@ const argv = yargs(hideBin(process.argv))
   .help()
   .parseSync();
 
-export const orgName = argv.organization as string;
+export const orgName = (argv.organization as string) ?? process.env.ADO_ORGANIZATION ?? "";
+if (!orgName) {
+  throw new Error("Organization name must be provided via argument or ADO_ORGANIZATION env variable");
+}
+
 const tenantId = argv.tenant;
 const orgUrl = "https://dev.azure.com/" + orgName;
+const _projectName = process.env.ADO_PROJECT;
+
+const mcpApiKey = process.env.MCP_API_KEY;
+const readOnlyKey = process.env.MCP_API_KEY_READ_ONLY;
+const reviewerKey = process.env.MCP_API_KEY_REVIEWER;
+let mcpMode: "readonly" | "reviewer";
+if (mcpApiKey && readOnlyKey && mcpApiKey === readOnlyKey) {
+  mcpMode = "readonly";
+} else if (mcpApiKey && reviewerKey && mcpApiKey === reviewerKey) {
+  mcpMode = "reviewer";
+} else {
+  throw new Error("Invalid or missing MCP_API_KEY");
+}
 
 async function getAzureDevOpsToken(): Promise<AccessToken> {
   if (process.env.ADO_MCP_AZURE_TOKEN_CREDENTIALS) {
@@ -60,14 +77,20 @@ async function getAzureDevOpsToken(): Promise<AccessToken> {
 
 function getAzureDevOpsClient(userAgentComposer: UserAgentComposer): () => Promise<azdev.WebApi> {
   return async () => {
-    const token = await getAzureDevOpsToken();
-    const authHandler = azdev.getBearerHandler(token.token);
-    const connection = new azdev.WebApi(orgUrl, authHandler, undefined, {
+    const options = {
       productName: "AzureDevOps.MCP",
       productVersion: packageVersion,
       userAgent: userAgentComposer.userAgent,
-    });
-    return connection;
+    };
+
+    if (process.env.ADO_PAT) {
+      const authHandler = azdev.getPersonalAccessTokenHandler(process.env.ADO_PAT);
+      return new azdev.WebApi(orgUrl, authHandler, undefined, options);
+    }
+
+    const token = await getAzureDevOpsToken();
+    const authHandler = azdev.getBearerHandler(token.token);
+    return new azdev.WebApi(orgUrl, authHandler, undefined, options);
   };
 }
 
@@ -84,7 +107,9 @@ async function main() {
 
   configurePrompts(server);
 
-  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient(userAgentComposer), () => userAgentComposer.userAgent);
+  configureAllTools(server, getAzureDevOpsToken, getAzureDevOpsClient(userAgentComposer), () => userAgentComposer.userAgent, {
+    mode: mcpMode,
+  });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

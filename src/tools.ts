@@ -14,9 +14,42 @@ import { configureSearchTools } from "./tools/search.js";
 import { configureTestPlanTools } from "./tools/testplans.js";
 import { configureWikiTools } from "./tools/wiki.js";
 import { configureWorkTools } from "./tools/work.js";
-import { configureWorkItemTools } from "./tools/workitems.js";
+import { configureWorkItemTools, WORKITEM_TOOLS } from "./tools/workitems.js";
 
-function configureAllTools(server: McpServer, tokenProvider: () => Promise<AccessToken>, connectionProvider: () => Promise<WebApi>, userAgentProvider: () => string) {
+interface ToolConfigOptions {
+  mode?: "readonly" | "reviewer";
+}
+
+function configureAllTools(
+  server: McpServer,
+  tokenProvider: () => Promise<AccessToken>,
+  connectionProvider: () => Promise<WebApi>,
+  userAgentProvider: () => string,
+  options?: ToolConfigOptions
+) {
+  if (options?.mode === "readonly") {
+    configureWorkItemTools(server, tokenProvider, connectionProvider, userAgentProvider);
+    const readOnlyTools = new Set([
+      WORKITEM_TOOLS.my_work_items,
+      WORKITEM_TOOLS.list_backlogs,
+      WORKITEM_TOOLS.list_backlog_work_items,
+      WORKITEM_TOOLS.get_work_item,
+      WORKITEM_TOOLS.get_work_items_batch_by_ids,
+      WORKITEM_TOOLS.list_work_item_comments,
+      WORKITEM_TOOLS.get_work_items_for_iteration,
+      WORKITEM_TOOLS.get_work_item_type,
+      WORKITEM_TOOLS.get_query,
+      WORKITEM_TOOLS.get_query_results_by_id,
+    ]);
+    const registered = Object.keys((server as any)._registeredTools) as string[];
+    for (const name of registered) {
+      if (!readOnlyTools.has(name)) {
+        delete (server as any)._registeredTools[name];
+      }
+    }
+    return;
+  }
+
   configureCoreTools(server, tokenProvider, connectionProvider, userAgentProvider);
   configureWorkTools(server, tokenProvider, connectionProvider);
   configureBuildTools(server, tokenProvider, connectionProvider, userAgentProvider);

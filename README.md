@@ -252,6 +252,19 @@ Open GitHub Copilot Chat and try a prompt like `List ADO projects`.
 
 See the [getting started documentation](./docs/GETTINGSTARTED.md) to use our MCP Server with other tools such as Visual Studio 2022, Claude Code, and Cursor.
 
+### Environment Variables
+
+When deploying the server (for example in Docker or Azure Web Apps), the following environment variables control authentication and scope:
+
+- `ADO_PAT`: Azure DevOps personal access token.
+- `ADO_ORGANIZATION`: default Azure DevOps organization name.
+- `ADO_PROJECT`: default project name.
+- `MCP_API_KEY`: API key supplied by clients.
+- `MCP_API_KEY_READ_ONLY`: value that enables read-only work item tools.
+- `MCP_API_KEY_REVIEWER`: value that enables the full tool set including repository access.
+
+The server compares `MCP_API_KEY` to the configured keys and exposes only the tools allowed for that role.
+
 ## 📝 Troubleshooting
 
 See the [Troubleshooting guide](./docs/TROUBLESHOOTING.md) for help with common issues and logging.
